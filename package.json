@@ -1,0 +1,44 @@
+{
+  "name": "@qqvu/openclaw-channel",
+  "version": "1.0.9",
+  "description": "OpenClaw channel plugin for QQvu platform",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "author": "QQvu Team",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run"
+  },
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ],
+    "channel": {
+      "id": "pufferfish",
+      "label": "QQvu",
+      "blurb": "Connect to Pufferfish instant messaging platform with AI capabilities"
+    }
+  },
+  "files": [
+    "dist",
+    "package.json",
+    "README.md",
+    "LICENSE",
+    "openclaw.plugin.json"
+  ],
+  "dependencies": {
+    "crypto": "^1.0.1",
+    "node-fetch": "^3.3.2",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "@types/ws": "^8.5.12",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.0"
+  }
+}

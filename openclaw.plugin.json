@@ -1,0 +1,22 @@
+{
+  "id": "pufferfish-channel",
+  "name": "Pufferfish IM Channel",
+  "description": "OpenClaw channel plugin for Pufferfish IM platform",
+  "channels": ["pufferfish"],
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": true,
+    "properties": {
+      "bots": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "机器人配置集合；key 会作为运行时 accountId，建议直接使用 botUid，值中需要 apiUrl + privateKey（PEM，可选 enabled）"
+      },
+      "botProfilesByBotUid": {
+        "type": "object",
+        "additionalProperties": true,
+        "description": "按 botUid 配置 systemPrompt / skills；key 应与 bots 中 botUid 一致"
+      }
+    }
+  }
+}
