@@ -20,6 +20,21 @@ export class PufferfishAPIClient {
   static normalizeBaseUrl(apiUrl: string): string {
     let url = String(apiUrl ?? '').trim().replace(/\/+$/, '');
     if (url.endsWith('/v1')) url = url.slice(0, -3);
+    try {
+      const u = new URL(url);
+      const host = u.hostname.toLowerCase();
+      const isLocal =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === '::1';
+      // 线上环境优先使用 https，避免 POST 经 301 跳转导致方法被改写
+      if (u.protocol === 'http:' && !isLocal) {
+        u.protocol = 'https:';
+      }
+      url = u.toString().replace(/\/+$/, '');
+    } catch {
+      // 非法 URL 保持原值
+    }
     return url;
   }
 
