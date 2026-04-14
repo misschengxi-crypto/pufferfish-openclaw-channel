@@ -25,13 +25,23 @@ export class PufferfishAPIClient {
 
   /** 反代 TLS 终止时，服务端可能返回 ws://；若 apiUrl 是 https://，这里自动提升为 wss://。 */
   static normalizeWsUrl(apiUrl: string, wsUrl: string): string {
-    const api = String(apiUrl ?? '').trim();
     const ws = String(wsUrl ?? '').trim();
-    if (!api || !ws) return ws;
-    if (api.toLowerCase().startsWith('https://') && ws.toLowerCase().startsWith('ws://')) {
-      return `wss://${ws.slice('ws://'.length)}`;
+    if (!ws) return ws;
+    try {
+      const u = new URL(ws);
+      const host = u.hostname.toLowerCase();
+      const isLocal =
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host === '::1';
+      if (u.protocol === 'ws:' && !isLocal) {
+        u.protocol = 'wss:';
+      }
+      return u.toString();
+    } catch {
+      // 保持原值，避免因非法 URL 影响既有行为
+      return ws;
     }
-    return ws;
   }
 
   /** POST /v1/ai-bot/connect（challenge + privateKey 签名换取运行 token） */
