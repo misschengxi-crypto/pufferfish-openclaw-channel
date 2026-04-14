@@ -31,6 +31,13 @@ export class PufferfishWebSocketClient extends EventEmitter {
     return `[Pufferfish WS] [accountId=${accountId}] [botUserId=${botUserId}]`;
   }
 
+  private tokenDigest(token: string): string {
+    const value = String(token ?? '').trim();
+    if (!value) return '';
+    // 仅用于排查 token 是否变化，避免输出明文 token
+    return Buffer.from(value).toString('base64').slice(0, 12);
+  }
+
   /** 服务端重新签发运行 token 时同步，避免重连仍用旧 token */
   updateAccount(account: PufferfishAccount): void {
     this.account = account;
@@ -52,9 +59,24 @@ export class PufferfishWebSocketClient extends EventEmitter {
     const tokenQ = encodeURIComponent(this.account.token);
     const botIdQ = encodeURIComponent(String(this.account.botUserId));
     const wsUrl = `${this.account.wsUrl}?token=${tokenQ}&botId=${botIdQ}`;
+    const wsProtocol = (() => {
+      try {
+        return new URL(this.account.wsUrl).protocol;
+      } catch {
+        return 'invalid';
+      }
+    })();
 
     try {
-      console.log(`${this.prefix()} Connecting... wsUrl=${this.account.wsUrl}`);
+      console.log(
+        `${this.prefix()} Connecting...` +
+          ` wsUrlBase=${this.account.wsUrl}` +
+          ` wsProtocol=${wsProtocol}` +
+          ` hasToken=${Boolean(this.account.token)}` +
+          ` tokenDigest=${this.tokenDigest(this.account.token)}` +
+          ` botId=${this.account.botUserId}` +
+          ` queryKeys=token,botId`,
+      );
       this.ws = new WebSocket(wsUrl);
 
       this.ws.on('open', () => {
@@ -98,7 +120,14 @@ export class PufferfishWebSocketClient extends EventEmitter {
 
       this.ws.on('error', (error) => {
         this.isConnecting = false;
-        console.error(`${this.prefix()} Error:`, error);
+        console.error(
+          `${this.prefix()} Error:` +
+            ` wsUrlBase=${this.account.wsUrl}` +
+            ` wsProtocol=${wsProtocol}` +
+            ` tokenDigest=${this.tokenDigest(this.account.token)}` +
+            ` botId=${this.account.botUserId}`,
+          error,
+        );
         this.emit('error', error);
       });
 
