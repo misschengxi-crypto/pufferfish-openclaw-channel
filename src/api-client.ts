@@ -85,11 +85,22 @@ export class PufferfishAPIClient {
     if (!data.enabled || !data.apiUrl || !data.wsUrl || !data.botUserId || !data.token) {
       throw new Error(`connect 返回异常: ${JSON.stringify(data)}`);
     }
+    const normalizedWsUrl = PufferfishAPIClient.normalizeWsUrl(data.apiUrl, data.wsUrl);
+    console.log(
+      `[Pufferfish API] connect success` +
+        ` accountId=${data.accountId ?? botUid}` +
+        ` botUid=${data.botUid ?? botUid}` +
+        ` botUserId=${data.botUserId}` +
+        ` apiUrl=${data.apiUrl}` +
+        ` wsUrlRaw=${data.wsUrl}` +
+        ` wsUrlNormalized=${normalizedWsUrl}` +
+        ` tokenPrefix=${String(data.token).slice(0, 8)}`,
+    );
     return {
       accountId: data.accountId ?? botUid,
       enabled: true,
       apiUrl: data.apiUrl,
-      wsUrl: PufferfishAPIClient.normalizeWsUrl(data.apiUrl, data.wsUrl),
+      wsUrl: normalizedWsUrl,
       botUserId: Number(data.botUserId),
       botUid: data.botUid ?? botUid,
       token: data.token,
