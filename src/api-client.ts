@@ -23,6 +23,17 @@ export class PufferfishAPIClient {
     return url;
   }
 
+  /** 反代 TLS 终止时，服务端可能返回 ws://；若 apiUrl 是 https://，这里自动提升为 wss://。 */
+  static normalizeWsUrl(apiUrl: string, wsUrl: string): string {
+    const api = String(apiUrl ?? '').trim();
+    const ws = String(wsUrl ?? '').trim();
+    if (!api || !ws) return ws;
+    if (api.toLowerCase().startsWith('https://') && ws.toLowerCase().startsWith('ws://')) {
+      return `wss://${ws.slice('ws://'.length)}`;
+    }
+    return ws;
+  }
+
   /** POST /v1/ai-bot/connect（challenge + privateKey 签名换取运行 token） */
   static async connectBot(apiUrl: string, botUid: string, privateKeyPem: string): Promise<PufferfishAccount> {
     const base = PufferfishAPIClient.normalizeBaseUrl(apiUrl);
@@ -78,7 +89,7 @@ export class PufferfishAPIClient {
       accountId: data.accountId ?? botUid,
       enabled: true,
       apiUrl: data.apiUrl,
-      wsUrl: data.wsUrl,
+      wsUrl: PufferfishAPIClient.normalizeWsUrl(data.apiUrl, data.wsUrl),
       botUserId: Number(data.botUserId),
       botUid: data.botUid ?? botUid,
       token: data.token,
