@@ -19,6 +19,8 @@ export class PufferfishWebSocketClient extends EventEmitter {
   private heartbeatTimer: NodeJS.Timeout | null = null;  // 心跳定时器
   private isConnecting = false;                     // 是否正在连接中
   private shouldReconnect = true;                   // 是否应该自动重连
+  private ackedMessageIds = new Set<string>();      // 已回执的 messageId（避免重复 ack）
+  private ackedQueue: string[] = [];                // 有序队列，用于限制 Set 大小
 
   constructor(account: PufferfishAccount) {
     super();
@@ -100,6 +102,7 @@ export class PufferfishWebSocketClient extends EventEmitter {
               ` streamEnd=${(message as any)?.streamEnd ?? false}` +
               ` rawLen=${raw.length}`,
           );
+          this.ackInboundMessage((message as any)?.messageId);
           this.emit('message', message);
         } catch (error) {
           const raw = data?.toString?.() ?? '';
@@ -164,6 +167,34 @@ export class PufferfishWebSocketClient extends EventEmitter {
   send(data: any): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(data));
+    }
+  }
+
+  /**
+   * 回执服务端下行消息，避免断线补投导致重复触发 Agent。
+   *
+   * 约定：服务端支持 action=ack，字段 ackIds 或 messageId。
+   */
+  private ackInboundMessage(messageId: unknown): void {
+    const id = typeof messageId === 'string' ? messageId.trim() : '';
+    if (!id) return;
+    if (this.ackedMessageIds.has(id)) return;
+
+    this.ackedMessageIds.add(id);
+    this.ackedQueue.push(id);
+
+    const maxSize = 5000;
+    if (this.ackedQueue.length > maxSize) {
+      const removed = this.ackedQueue.splice(0, this.ackedQueue.length - maxSize);
+      for (const r of removed) {
+        this.ackedMessageIds.delete(r);
+      }
+    }
+
+    try {
+      this.send({ action: 'ack', ackIds: [id] });
+    } catch (_) {
+      // ack 失败不影响主流程，重连后服务端会重发，届时会再次 ack
     }
   }
 
