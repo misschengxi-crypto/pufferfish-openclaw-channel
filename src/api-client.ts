@@ -22,13 +22,10 @@ export class PufferfishAPIClient {
     if (url.endsWith('/v1')) url = url.slice(0, -3);
     try {
       const u = new URL(url);
-      const host = u.hostname.toLowerCase();
-      const isLocal =
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host === '::1';
+      const host = u.hostname;
+      const isInsecureSafeHost = this.isInsecureSafeHost(host);
       // 线上环境优先使用 https，避免 POST 经 301 跳转导致方法被改写
-      if (u.protocol === 'http:' && !isLocal) {
+      if (u.protocol === 'http:' && !isInsecureSafeHost) {
         u.protocol = 'https:';
       }
       url = u.toString().replace(/\/+$/, '');
@@ -44,12 +41,9 @@ export class PufferfishAPIClient {
     if (!ws) return ws;
     try {
       const u = new URL(ws);
-      const host = u.hostname.toLowerCase();
-      const isLocal =
-        host === 'localhost' ||
-        host === '127.0.0.1' ||
-        host === '::1';
-      if (u.protocol === 'ws:' && !isLocal) {
+      const host = u.hostname;
+      const isInsecureSafeHost = this.isInsecureSafeHost(host);
+      if (u.protocol === 'ws:' && !isInsecureSafeHost) {
         u.protocol = 'wss:';
       }
       return u.toString();
@@ -252,6 +246,36 @@ export class PufferfishAPIClient {
 
   private accountBotId(): number {
     return this.botUserId;
+  }
+
+  /**
+   * 本地和私网地址不应被强制升级为 https/wss。
+   */
+  private static isInsecureSafeHost(hostname: string): boolean {
+    const host = String(hostname ?? '').trim().toLowerCase();
+    if (!host) return false;
+    if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+    if (this.isPrivateIPv4(host)) return true;
+    if (host.startsWith('[') && host.endsWith(']')) {
+      const unwrapped = host.slice(1, -1);
+      if (unwrapped === '::1') return true;
+      if (unwrapped.startsWith('fc') || unwrapped.startsWith('fd')) return true;
+      if (unwrapped.startsWith('fe80:')) return true;
+    }
+    return false;
+  }
+
+  private static isPrivateIPv4(host: string): boolean {
+    const m = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!m) return false;
+    const nums = m.slice(1).map((v) => Number(v));
+    if (nums.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return false;
+    const [a, b] = nums;
+    if (a === 10) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true;
+    return false;
   }
 
   /**
