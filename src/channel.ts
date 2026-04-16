@@ -157,6 +157,8 @@ export const pufferfishChannel = {
       const { chatId, account } = resolveOutboundCtx(ctx);
 
       const client = new PufferfishAPIClient(account);
+        const cancelTargetMsgId = String(ctx?.MessageSid ?? ctx?.messageId ?? ctx?.MessageSidFull ?? '').trim();
+        const cancelMeta = cancelTargetMsgId ? { cancel_target_msg_id: cancelTargetMsgId } : undefined;
 
       try {
         if (streaming) {
@@ -173,6 +175,7 @@ export const pufferfishChannel = {
               content: chunks[i],
               isStream: true,
               streamEnd: isLast,
+                metadata: cancelMeta,
             });
             if (!isLast) {
               await new Promise(resolve => setTimeout(resolve, 50));
@@ -183,6 +186,7 @@ export const pufferfishChannel = {
             chatId,
             type: 'text',
             content: text,
+              metadata: cancelMeta,
           });
         }
         return { ok: true };
@@ -197,6 +201,8 @@ export const pufferfishChannel = {
       const { chatId, account } = resolveOutboundCtx(ctx);
 
       const client = new PufferfishAPIClient(account);
+        const cancelTargetMsgId = String(ctx?.MessageSid ?? ctx?.messageId ?? ctx?.MessageSidFull ?? '').trim();
+        const cancelMeta = cancelTargetMsgId ? { cancel_target_msg_id: cancelTargetMsgId } : undefined;
 
       try {
         const imageData = await client.downloadFile(imageUrl);
@@ -207,6 +213,7 @@ export const pufferfishChannel = {
           chatId,
           type: 'image',
           content: ossUrl,
+            metadata: cancelMeta,
         });
 
         return { ok: true };
@@ -222,6 +229,8 @@ export const pufferfishChannel = {
       const { chatId, account } = resolveOutboundCtx(ctx);
 
       const client = new PufferfishAPIClient(account);
+        const cancelTargetMsgId = String(ctx?.MessageSid ?? ctx?.messageId ?? ctx?.MessageSidFull ?? '').trim();
+        const cancelMeta = cancelTargetMsgId ? { cancel_target_msg_id: cancelTargetMsgId } : undefined;
 
       try {
         const fileData = await client.downloadFile(url);
@@ -233,7 +242,7 @@ export const pufferfishChannel = {
           chatId,
           type: 'file',
           content: ossUrl,
-          metadata: { fileName: name },
+            metadata: { fileName: name, ...(cancelMeta ?? {}) },
         });
 
         return { ok: true };

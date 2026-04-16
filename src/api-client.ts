@@ -168,6 +168,7 @@ export class PufferfishAPIClient {
     content: string;
     isStream: boolean;
     streamEnd: boolean;
+    metadata?: Record<string, any>;
   }): Promise<SendMessageResponse> {
     const encodedContent = this.encodeMessageContent('text', params.content, {
       isStream: params.isStream,
@@ -178,10 +179,12 @@ export class PufferfishAPIClient {
       chatId: params.chatId,
       messageType: 'text',
       content: encodedContent,
-      metadata: {
+      // gRPC/HTTP 侧 metadata 类型为 map<string,string>，这里统一转成字符串。
+      metadata: this.toStringMap({
+        ...(params.metadata ?? {}),
         isStream: params.isStream,
         streamEnd: params.streamEnd,
-      },
+      }),
     });
 
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };

@@ -168,6 +168,8 @@ export default function register(api: any) {
     /** OpenClaw 在 Agent 产出回复后调用：可选执行内联工具计划、上传媒体、再发文本消息 */
     const deliver = async (outboundPayload: any): Promise<void> => {
       const client = new PufferfishAPIClient(payload.account);
+      // 将“被取消的触发轮次”透传给服务端，服务端收到 BotSendMessage 时可直接丢弃。
+      const cancelMeta = { cancel_target_msg_id: payload.messageId };
       const rawText = typeof outboundPayload?.text === 'string' ? outboundPayload.text : '';
 
       // 打印模型回复，便于排查（避免日志过长，仅截断）
@@ -275,6 +277,7 @@ export default function register(api: any) {
             chatId: payload.chatId,
             type: 'image',
             content: ossUrl,
+            metadata: cancelMeta,
           });
         } else {
           const fileExt = mime?.split('/')?.[1] ?? 'bin';
@@ -284,7 +287,7 @@ export default function register(api: any) {
             chatId: payload.chatId,
             type: 'file',
             content: ossUrl,
-            metadata: { fileName },
+            metadata: { fileName, ...cancelMeta },
           });
         }
       }
@@ -294,6 +297,7 @@ export default function register(api: any) {
           chatId: payload.chatId,
           type: 'text',
           content: text,
+          metadata: cancelMeta,
         });
       }
     };
