@@ -1,6 +1,6 @@
 {
   "name": "@qqvu/openclaw-channel",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "OpenClaw channel plugin for QQvu platform",
   "type": "module",
   "main": "./dist/index.js",
