@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { EventEmitter } from 'events';
 import type { PufferfishAccount, PufferfishMessage } from './types.js';
+import { getPluginVersion } from './plugin-version.js';
 
 /**
  * Pufferfish WebSocket 客户端
@@ -21,6 +22,7 @@ export class PufferfishWebSocketClient extends EventEmitter {
   private shouldReconnect = true;                   // 是否应该自动重连
   private ackedMessageIds = new Set<string>();      // 已回执的 messageId（避免重复 ack）
   private ackedQueue: string[] = [];                // 有序队列，用于限制 Set 大小
+  private static readonly pluginVersion = getPluginVersion();
 
   constructor(account: PufferfishAccount) {
     super();
@@ -84,6 +86,11 @@ export class PufferfishWebSocketClient extends EventEmitter {
       this.ws.on('open', () => {
         this.isConnecting = false;
         this.emit('connected');
+        // 连接建立后立即发送 hello，声明插件版本与能力集合。
+        this.send({
+          action: 'hello',
+          pluginVersion: PufferfishWebSocketClient.pluginVersion,
+        });
         this.startHeartbeat();
         console.log(`${this.prefix()} Connected`);
       });
@@ -91,7 +98,30 @@ export class PufferfishWebSocketClient extends EventEmitter {
       this.ws.on('message', (data: WebSocket.Data) => {
         try {
           const raw = data.toString();
-          const message = JSON.parse(raw) as PufferfishMessage;
+          const parsed = JSON.parse(raw) as any;
+          if (parsed && typeof parsed === 'object' && typeof parsed.action === 'string') {
+            const action = String(parsed.action).toLowerCase();
+            if (action === 'hello_ack') {
+              // hello_ack 是控制帧，不应进入普通消息处理流。
+              const status = String(parsed.status ?? 'pending').toLowerCase();
+              const normalizedStatus =
+                status === 'ok' || status === 'degraded' || status === 'reject' ? status : 'pending';
+              this.emit('hello_ack', parsed);
+              console.log(
+                `${this.prefix()} Handshake ack` +
+                  ` status=${normalizedStatus}` +
+                  ` minPluginVersion=${parsed.minPluginVersion ?? 'unknown'}`,
+              );
+              return;
+            }
+            if (action === 'error') {
+              // 服务端门禁失败（如 FEATURE_NOT_SUPPORTED）统一走控制帧事件。
+              this.emit('channel_error', parsed);
+              console.warn(`${this.prefix()} Server channel error`, parsed);
+              return;
+            }
+          }
+          const message = parsed as PufferfishMessage;
           console.log(
             `${this.prefix()} Inbound message received` +
               ` messageId=${(message as any)?.messageId ?? 'unknown'}` +

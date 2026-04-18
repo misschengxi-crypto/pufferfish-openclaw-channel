@@ -419,6 +419,14 @@ export default function register(api: any) {
       api.logger.info(
         `Pufferfish WebSocket 已连接 [accountId: ${account.accountId}] [botUserId: ${account.botUserId}]`,
       );
+    });
+
+    wsClient.on('hello_ack', (ack: any) => {
+      const status = String(ack?.status ?? 'pending').toLowerCase();
+      api.logger.info(
+        `Pufferfish hello_ack [accountId: ${account.accountId}] [botUserId: ${account.botUserId}]` +
+          ` status=${status} minPluginVersion=${String(ack?.minPluginVersion ?? 'unknown')}`,
+      );
       sendSyncConfig(account, wsClient);
     });
 
