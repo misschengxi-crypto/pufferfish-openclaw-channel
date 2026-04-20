@@ -13,6 +13,9 @@ import { pufferfishChannel, removeRuntimeAccount, setRuntimeAccount } from './ch
 import { PufferfishWebSocketClient } from './websocket-client.js';
 import { MessageAdapter } from './message-adapter.js';
 import { PufferfishAPIClient } from './api-client.js';
+import { readFile, writeFile } from 'node:fs/promises';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
 import type {
   PufferfishAccount,
   PufferfishBotProfile,
@@ -46,8 +49,50 @@ export default function register(api: any) {
     );
   };
 
+  /**
+   * 首次安装后自动补齐最小频道配置，避免用户手工创建 channels.pufferfish。
+   * 为了不干扰插件管理流程（install/uninstall/list），调用方需先判断 shouldSkipBotBootstrap。
+   */
+  const seedMinimalChannelConfigIfMissing = async (): Promise<void> => {
+    const runtimeCfg = api.config ?? {};
+    if (runtimeCfg.channels?.pufferfish) {
+      return;
+    }
+
+    // 先补运行时配置，确保本次进程内即可看到 QQvu。
+    runtimeCfg.channels = runtimeCfg.channels ?? {};
+    runtimeCfg.channels.pufferfish = { bots: {} };
+    api.config = runtimeCfg;
+
+    const configPath = join(homedir(), '.openclaw', 'openclaw.json');
+    try {
+      const raw = await readFile(configPath, 'utf8');
+      const diskCfg = JSON.parse(raw || '{}');
+      if (!diskCfg.channels?.pufferfish) {
+        diskCfg.channels = diskCfg.channels ?? {};
+        diskCfg.channels.pufferfish = { bots: {} };
+        await writeFile(configPath, `${JSON.stringify(diskCfg, null, 2)}\n`, 'utf8');
+        api.logger.info(
+          '已自动初始化 channels.pufferfish.bots = {}（首次安装默认配置，无需用户手工填写）',
+        );
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      api.logger.warn(`自动写入 openclaw.json 的默认 pufferfish 配置失败：${msg}`);
+    }
+  };
+
+  const skipBootstrapForPluginMgmt = shouldSkipBotBootstrap();
+
   // 注册 Pufferfish Channel 到 OpenClaw
   api.registerChannel({ plugin: pufferfishChannel });
+
+  if (!skipBootstrapForPluginMgmt) {
+    seedMinimalChannelConfigIfMissing().catch((error) => {
+      const msg = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      api.logger.warn(`初始化默认 pufferfish 配置失败：${msg}`);
+    });
+  }
 
   // OpenClaw 2026+：完整配置在 api.config（旧版 api.getConfig 已移除）
   const config = api.config ?? {};
@@ -548,7 +593,7 @@ export default function register(api: any) {
     applyAccounts(accounts);
   };
 
-  if (shouldSkipBotBootstrap()) {
+  if (skipBootstrapForPluginMgmt) {
     api.logger.info('检测到插件管理命令，跳过 Pufferfish 机器人连接初始化。');
   } else {
     api.logger.info('Pufferfish Channel 运行在 bot 直连模式（challenge + privateKey -> /v1/ai-bot/connect）');
