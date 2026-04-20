@@ -2,8 +2,8 @@ import { PufferfishAPIClient } from './api-client.js';
 import type { PufferfishAccount } from './types.js';
 
 const runtimeAccounts = new Map<string, PufferfishAccount>();
-// Placeholder account shown in Dashboard before real bot config exists.
-const UNCONFIGURED_ACCOUNT_ID = '__unconfigured__';
+// 温和占位账号：仅在已存在 channels.pufferfish 但未配置具体 bots 时用于 UI 展示。
+const PLACEHOLDER_ACCOUNT_ID = 'default';
 
 export function setRuntimeAccount(account: PufferfishAccount): void {
   // 记录运行时已连接账号，优先于静态配置读取，保证 token 等动态字段最新。
@@ -49,12 +49,11 @@ function resolvePufferfishAccountFromConfig(cfg: any, accountId?: string): Puffe
   const account =
     cfg.channels?.pufferfish?.bots?.[resolvedAccountId] ??
     cfg.channels?.pufferfish?.accounts?.[resolvedAccountId];
-  // Keep channel visible in Dashboard even for first-time users with no bot config.
-  if (!account || resolvedAccountId === UNCONFIGURED_ACCOUNT_ID) {
+  if (!account) {
     return {
       accountId: resolvedAccountId,
-      // 设为 true 以便 Dashboard 展示该频道入口；真实连接仍由 index.ts 的空配置分支兜底阻断。
-      enabled: true,
+      // 占位账号不参与实际连接，仅用于 Dashboard 的配置入口展示。
+      enabled: false,
       apiUrl: '',
       wsUrl: '',
       botUserId: 0,
@@ -127,11 +126,13 @@ export const pufferfishChannel = {
   config: {
     // 列出所有配置的账号ID
     listAccountIds: (cfg: any) => {
+      const hasChannelNode = !!cfg.channels?.pufferfish;
       const accountIds = Object.keys(
         cfg.channels?.pufferfish?.bots ?? cfg.channels?.pufferfish?.accounts ?? {},
       );
-      // Return a placeholder so UI can render the QQvu channel entry pre-configuration.
-      return accountIds.length > 0 ? accountIds : [UNCONFIGURED_ACCOUNT_ID];
+      if (accountIds.length > 0) return accountIds;
+      // 仅当用户已显式存在 channels.pufferfish 时才返回占位账号，避免影响其它频道总览渲染。
+      return hasChannelNode ? [PLACEHOLDER_ACCOUNT_ID] : [];
     },
 
     // 解析指定账号的配置
