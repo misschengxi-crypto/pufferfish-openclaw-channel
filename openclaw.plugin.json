@@ -5,16 +5,62 @@
   "channels": ["pufferfish"],
   "configSchema": {
     "type": "object",
-    "additionalProperties": true,
+    "additionalProperties": false,
+    "$defs": {
+      "botConfig": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean",
+            "description": "是否启用该机器人"
+          },
+          "apiUrl": {
+            "type": "string",
+            "description": "Pufferfish API 地址，例如 http://127.0.0.1:5020"
+          },
+          "botUid": {
+            "type": "string",
+            "description": "机器人唯一标识；留空时默认使用当前 key"
+          },
+          "privateKey": {
+            "type": "string",
+            "description": "Ed25519 私钥 PEM（用于 connect challenge 签名认证）"
+          }
+        },
+        "required": ["apiUrl", "privateKey"]
+      },
+      "botProfile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "systemPrompt": {
+            "type": "string",
+            "description": "机器人系统提示词"
+          },
+          "skills": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "启用技能列表（字符串数组）"
+          }
+        }
+      }
+    },
     "properties": {
       "bots": {
         "type": "object",
-        "additionalProperties": true,
+        "additionalProperties": {
+          "$ref": "#/$defs/botConfig"
+        },
         "description": "机器人配置集合；key 会作为运行时 accountId，建议直接使用 botUid，值中需要 apiUrl + privateKey（PEM，可选 enabled）"
       },
       "botProfilesByBotUid": {
         "type": "object",
-        "additionalProperties": true,
+        "additionalProperties": {
+          "$ref": "#/$defs/botProfile"
+        },
         "description": "按 botUid 配置 systemPrompt / skills；key 应与 bots 中 botUid 一致"
       }
     }
