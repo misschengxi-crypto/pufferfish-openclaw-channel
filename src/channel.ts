@@ -2,12 +2,16 @@ import { PufferfishAPIClient } from './api-client.js';
 import type { PufferfishAccount } from './types.js';
 
 const runtimeAccounts = new Map<string, PufferfishAccount>();
+// Placeholder account shown in Dashboard before real bot config exists.
+const UNCONFIGURED_ACCOUNT_ID = '__unconfigured__';
 
 export function setRuntimeAccount(account: PufferfishAccount): void {
+  // 记录运行时已连接账号，优先于静态配置读取，保证 token 等动态字段最新。
   runtimeAccounts.set(account.accountId, account);
 }
 
 export function removeRuntimeAccount(accountId: string): void {
+  // 账号断开后清理缓存，避免后续出站继续使用旧连接参数。
   runtimeAccounts.delete(accountId);
 }
 
@@ -35,24 +39,42 @@ function normalizePufferfishChatId(raw: string): string {
 }
 
 function resolvePufferfishAccountFromConfig(cfg: any, accountId?: string): PufferfishAccount {
-  const runtime = runtimeAccounts.get(accountId ?? 'default');
+  // 先读运行时账号：包含 connect 后换到的 token / botUserId 等动态信息。
+  const resolvedAccountId = accountId ?? 'default';
+  const runtime = runtimeAccounts.get(resolvedAccountId);
   if (runtime) {
     return runtime;
   }
 
-  const account = cfg.channels?.pufferfish?.bots?.[accountId ?? 'default'] ?? cfg.channels?.pufferfish?.accounts?.[accountId ?? 'default'];
+  const account =
+    cfg.channels?.pufferfish?.bots?.[resolvedAccountId] ??
+    cfg.channels?.pufferfish?.accounts?.[resolvedAccountId];
+  // Keep channel visible in Dashboard even for first-time users with no bot config.
+  if (!account || resolvedAccountId === UNCONFIGURED_ACCOUNT_ID) {
+    return {
+      accountId: resolvedAccountId,
+      enabled: false,
+      apiUrl: '',
+      wsUrl: '',
+      botUserId: 0,
+      botUid: undefined,
+      token: '',
+    };
+  }
+
   return {
-    accountId: accountId ?? 'default',
+    accountId: resolvedAccountId,
     enabled: account?.enabled ?? true,
     apiUrl: account?.apiUrl ?? 'http://localhost:8080',
     wsUrl: account?.wsUrl ?? 'ws://localhost:8080/v1/ai-bot/ws',
     botUserId: account?.botUserId ?? 0,
-    botUid: typeof account?.botUid === 'string' ? account.botUid : accountId ?? 'default',
+    botUid: typeof account?.botUid === 'string' ? account.botUid : resolvedAccountId,
     token: account?.token ?? '',
   };
 }
 
 function resolveOutboundCtx(ctx: any): { chatId: string; account: PufferfishAccount } {
+  // 出站时统一解析目标 chatId 与账号信息，兼容不同调用方字段。
   const rawTarget = String(ctx.chatId ?? ctx.to ?? '').trim();
   const chatId = normalizePufferfishChatId(rawTarget);
   const account = ctx.account ?? resolvePufferfishAccountFromConfig(ctx.cfg, ctx.accountId);
@@ -87,8 +109,13 @@ export const pufferfishChannel = {
   // 配置解析：从 OpenClaw 配置文件读取账号信息
   config: {
     // 列出所有配置的账号ID
-    listAccountIds: (cfg: any) =>
-      Object.keys(cfg.channels?.pufferfish?.bots ?? cfg.channels?.pufferfish?.accounts ?? {}),
+    listAccountIds: (cfg: any) => {
+      const accountIds = Object.keys(
+        cfg.channels?.pufferfish?.bots ?? cfg.channels?.pufferfish?.accounts ?? {},
+      );
+      // Return a placeholder so UI can render the QQvu channel entry pre-configuration.
+      return accountIds.length > 0 ? accountIds : [UNCONFIGURED_ACCOUNT_ID];
+    },
 
     // 解析指定账号的配置
     resolveAccount: (cfg: any, accountId?: string): PufferfishAccount =>
@@ -100,7 +127,9 @@ export const pufferfishChannel = {
    * 否则会走「通讯录」目录匹配，本通道未实现 directory 时会报 Unknown target。
    */
   messaging: {
+    // 规范化目标ID（如 user:123 -> user_123），减少上层输入差异。
     normalizeTarget: (raw: string) => normalizePufferfishChatId(raw),
+    // 根据目标格式推断会话类型，帮助 OpenClaw 选择 direct/group 路由。
     inferTargetChatType: ({ to }: { to: string }) => {
       const t = String(to ?? '').trim();
       if (/^group_\d+$/i.test(t)) return 'group';
@@ -114,6 +143,7 @@ export const pufferfishChannel = {
     targetResolver: {
       hint:
         '私聊：`user_<用户数字ID>`、`user:<ID>` 或直接写用户数字 ID；群：`group_<群ID>` 或 `group:<ID>`。',
+      // 判断输入是否像“可直接使用的 ID”，避免误走通讯录匹配逻辑。
       looksLikeId: (trimmed: string) => {
         if (/^(user|group)_\d+$/i.test(trimmed)) return true;
         if (/^(user|group):\d+$/i.test(trimmed)) return true;
@@ -121,6 +151,7 @@ export const pufferfishChannel = {
         if (/^\d+$/.test(trimmed)) return true;
         return false;
       },
+      // 将用户输入解析成标准投递目标（to/kind/display）。
       resolveTarget: async (params: {
         input: string;
         normalized: string;
@@ -151,6 +182,7 @@ export const pufferfishChannel = {
 
     /**
      * OpenClaw 传入 ctx：`to`（投递目标）、`accountId`、`cfg`；与自定义 chatId / account 兼容。
+     * 发送文本消息；当 streaming=true 时按增量片段模拟流式输出。
      */
     sendText: async (ctx: any) => {
       const { text, streaming } = ctx;
@@ -197,6 +229,7 @@ export const pufferfishChannel = {
     },
 
     sendImage: async (ctx: any) => {
+      // 下载外部图片并上传到 Pufferfish OSS，再发送 image 消息。
       const imageUrl = ctx.imageUrl ?? ctx.mediaUrl;
       const { chatId, account } = resolveOutboundCtx(ctx);
 
@@ -224,6 +257,7 @@ export const pufferfishChannel = {
     },
 
     sendFile: async (ctx: any) => {
+      // 下载外部文件并上传到 Pufferfish OSS，再发送 file 消息。
       const { fileUrl, fileName, mediaUrl } = ctx;
       const url = fileUrl ?? mediaUrl;
       const { chatId, account } = resolveOutboundCtx(ctx);

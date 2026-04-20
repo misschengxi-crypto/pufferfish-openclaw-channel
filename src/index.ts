@@ -494,6 +494,16 @@ export default function register(api: any) {
    * 一个 botUid 就是一只独立机器人，因此不会和其它机器人串线。
    */
   const loadBotAccounts = async (): Promise<void> => {
+    // First-run path: plugin is installed but user hasn't provided bot credentials yet.
+    if (Object.keys(botConfigs).length === 0) {
+      api.logger.warn(
+        'QQvu channel is loaded but no bots are configured. Please add entries under channels.pufferfish.bots in openclaw.json.',
+      );
+      // Ensure runtime is clean and avoid attempting any network connection.
+      applyAccounts([]);
+      return;
+    }
+
     const accounts: PufferfishAccount[] = [];
     for (const [rawAccountId, botConfig] of Object.entries(botConfigs)) {
       const accountId = String(rawAccountId).trim();
