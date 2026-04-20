@@ -53,7 +53,8 @@ function resolvePufferfishAccountFromConfig(cfg: any, accountId?: string): Puffe
   if (!account || resolvedAccountId === UNCONFIGURED_ACCOUNT_ID) {
     return {
       accountId: resolvedAccountId,
-      enabled: false,
+      // 设为 true 以便 Dashboard 展示该频道入口；真实连接仍由 index.ts 的空配置分支兜底阻断。
+      enabled: true,
       apiUrl: '',
       wsUrl: '',
       botUserId: 0,
@@ -79,6 +80,22 @@ function resolveOutboundCtx(ctx: any): { chatId: string; account: PufferfishAcco
   const chatId = normalizePufferfishChatId(rawTarget);
   const account = ctx.account ?? resolvePufferfishAccountFromConfig(ctx.cfg, ctx.accountId);
   return { chatId, account };
+}
+
+/**
+ * 检查账号是否完成基础配置（至少具备 apiUrl + token）。
+ * 未配置时给用户友好错误，避免出现晦涩的网络/鉴权异常。
+ */
+function validateAccountReady(account: PufferfishAccount): string | null {
+  const apiUrl = String(account?.apiUrl ?? '').trim();
+  const token = String(account?.token ?? '').trim();
+  if (!apiUrl) {
+    return 'QQvu 未配置：缺少 channels.pufferfish.bots.*.apiUrl';
+  }
+  if (!token) {
+    return 'QQvu 未配置：机器人尚未完成 connect 鉴权（缺少运行 token）';
+  }
+  return null;
 }
 
 /**
@@ -187,6 +204,10 @@ export const pufferfishChannel = {
     sendText: async (ctx: any) => {
       const { text, streaming } = ctx;
       const { chatId, account } = resolveOutboundCtx(ctx);
+      const notReadyReason = validateAccountReady(account);
+      if (notReadyReason) {
+        return { ok: false, error: notReadyReason };
+      }
 
       const client = new PufferfishAPIClient(account);
         const cancelTargetMsgId = String(ctx?.MessageSid ?? ctx?.messageId ?? ctx?.MessageSidFull ?? '').trim();
@@ -232,6 +253,10 @@ export const pufferfishChannel = {
       // 下载外部图片并上传到 Pufferfish OSS，再发送 image 消息。
       const imageUrl = ctx.imageUrl ?? ctx.mediaUrl;
       const { chatId, account } = resolveOutboundCtx(ctx);
+      const notReadyReason = validateAccountReady(account);
+      if (notReadyReason) {
+        return { ok: false, error: notReadyReason };
+      }
 
       const client = new PufferfishAPIClient(account);
         const cancelTargetMsgId = String(ctx?.MessageSid ?? ctx?.messageId ?? ctx?.MessageSidFull ?? '').trim();
@@ -261,6 +286,10 @@ export const pufferfishChannel = {
       const { fileUrl, fileName, mediaUrl } = ctx;
       const url = fileUrl ?? mediaUrl;
       const { chatId, account } = resolveOutboundCtx(ctx);
+      const notReadyReason = validateAccountReady(account);
+      if (notReadyReason) {
+        return { ok: false, error: notReadyReason };
+      }
 
       const client = new PufferfishAPIClient(account);
         const cancelTargetMsgId = String(ctx?.MessageSid ?? ctx?.messageId ?? ctx?.MessageSidFull ?? '').trim();
