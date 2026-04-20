@@ -18,7 +18,6 @@ import type {
   PufferfishBotProfile,
   PufferfishBotConfig,
 } from './types.js';
-import {channel} from "node:diagnostics_channel";
 
 /**
  * OpenClaw 插件注册函数
@@ -27,6 +26,25 @@ import {channel} from "node:diagnostics_channel";
  */
 export default function register(api: any) {
   api.logger.info('======Pufferfish Channel Plugin loaded!=======');
+
+  /**
+   * 在插件管理命令（install/uninstall/list 等）下，避免触发机器人网络连接。
+   * 这些命令只关心插件元数据与文件变更，连接失败日志会严重干扰用户体验。
+   */
+  const shouldSkipBotBootstrap = (): boolean => {
+    const argv = process.argv.map((part) => String(part).toLowerCase());
+    const hasPluginsKeyword = argv.includes('plugins');
+    if (!hasPluginsKeyword) return false;
+    return (
+      argv.includes('install') ||
+      argv.includes('uninstall') ||
+      argv.includes('remove') ||
+      argv.includes('list') ||
+      argv.includes('ls') ||
+      argv.includes('enable') ||
+      argv.includes('disable')
+    );
+  };
 
   // 注册 Pufferfish Channel 到 OpenClaw
   api.registerChannel({ plugin: pufferfishChannel });
@@ -530,11 +548,15 @@ export default function register(api: any) {
     applyAccounts(accounts);
   };
 
-  api.logger.info('Pufferfish Channel 运行在 bot 直连模式（challenge + privateKey -> /v1/ai-bot/connect）');
-  loadBotAccounts().catch((error) => {
-    const msg = error instanceof Error ? (error.stack ?? error.message) : String(error);
-    api.logger.error('加载机器人配置失败:', msg);
-  });
+  if (shouldSkipBotBootstrap()) {
+    api.logger.info('检测到插件管理命令，跳过 Pufferfish 机器人连接初始化。');
+  } else {
+    api.logger.info('Pufferfish Channel 运行在 bot 直连模式（challenge + privateKey -> /v1/ai-bot/connect）');
+    loadBotAccounts().catch((error) => {
+      const msg = error instanceof Error ? (error.stack ?? error.message) : String(error);
+      api.logger.error('加载机器人配置失败:', msg);
+    });
+  }
 
   // 网关退出时释放所有连接，避免进程悬挂或重复注册
   api.on('gateway_stop', () => {
