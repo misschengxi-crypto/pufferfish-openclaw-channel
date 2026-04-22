@@ -48,7 +48,7 @@ Configure `channels.pufferfish` in `~/.openclaw/openclaw.json`:
       },
       "botProfilesByBotUid": {
         "your-bot-uid": {
-          "systemPrompt": "You are a helpful assistant.",
+          "systemPrompt": "你是一个中文助手。仅根据用户当前问题直接回答，不进行角色扮演，不主动寒暄，不要求用户先设定称呼或身份。",
           "skills": ["skillA", "skillB"]
         }
       }
@@ -56,6 +56,8 @@ Configure `channels.pufferfish` in `~/.openclaw/openclaw.json`:
   }
 }
 ```
+
+`systemPrompt` is optional. If omitted or empty, the plugin now sends a neutral fallback prompt so the bot replies directly to user questions without role-play setup chatter.
 
 You can also copy from the safe template:
 

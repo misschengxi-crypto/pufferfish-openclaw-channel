@@ -29,6 +29,8 @@ import type {
  */
 export default function register(api: any) {
   api.logger.info('======Pufferfish Channel Plugin loaded!=======');
+  const FALLBACK_SYSTEM_PROMPT =
+    '你是一个中文助手。仅根据用户当前问题直接回答，不进行角色扮演，不主动寒暄，不要求用户先设定称呼或身份。';
 
   /**
    * 在插件管理命令（install/uninstall/list 等）下，避免触发机器人网络连接。
@@ -133,22 +135,22 @@ export default function register(api: any) {
     };
   };
 
-  /** WS 就绪后把 systemPrompt + skills 同步给 Pufferfish 服务端（无 prompt 则跳过并打日志） */
+  /** systemPrompt 可选：未配置时使用中性兜底，避免出现强人设或初始化话术。 */
+  const resolveSystemPrompt = (profile: PufferfishBotProfile): string => {
+    const configured = String(profile.systemPrompt ?? '').trim();
+    return configured || FALLBACK_SYSTEM_PROMPT;
+  };
+
+  /** WS 就绪后把 systemPrompt + skills 同步给 Pufferfish 服务端 */
   const sendSyncConfig = (account: PufferfishAccount, wsClient: PufferfishWebSocketClient): void => {
     if (!wsClient.isOpen()) {
       return;
     }
 
     const profile = resolveBotProfile(account);
-    const systemPrompt = String(profile.systemPrompt ?? '').trim();
+    const systemPrompt = resolveSystemPrompt(profile);
     const skills = normalizeSkills(profile.skills);
-
-    if (!systemPrompt) {
-      api.logger.warn(
-        `sync_config 缺少 systemPrompt，已跳过 [accountId=${account.accountId}] [botUserId=${account.botUserId}]`,
-      );
-      return;
-    }
+    const usedFallbackPrompt = !String(profile.systemPrompt ?? '').trim();
 
     wsClient.send({
       action: 'sync_config',
@@ -157,7 +159,8 @@ export default function register(api: any) {
     });
 
     api.logger.info(
-      `已发送 sync_config [accountId=${account.accountId}] [botUserId=${account.botUserId}] [skills=${skills.length}]`,
+      `已发送 sync_config [accountId=${account.accountId}] [botUserId=${account.botUserId}]` +
+        ` [skills=${skills.length}] [fallbackPrompt=${usedFallbackPrompt}]`,
     );
   };
 
