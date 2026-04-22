@@ -13,6 +13,7 @@ import { pufferfishChannel, removeRuntimeAccount, setRuntimeAccount } from './ch
 import { PufferfishWebSocketClient } from './websocket-client.js';
 import { MessageAdapter } from './message-adapter.js';
 import { PufferfishAPIClient } from './api-client.js';
+import { DEFAULT_PUFFERFISH_API_URL } from './defaults.js';
 import { readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
@@ -573,11 +574,11 @@ export default function register(api: any) {
     const accounts: PufferfishAccount[] = [];
     for (const [rawAccountId, botConfig] of Object.entries(botConfigs)) {
       const accountId = String(rawAccountId).trim();
-      const apiUrl = String(botConfig?.apiUrl ?? '').trim();
+      const apiUrl = String(botConfig?.apiUrl ?? DEFAULT_PUFFERFISH_API_URL).trim();
       const botUid = String(botConfig?.botUid ?? accountId).trim();
       const privateKey = String((botConfig as any)?.privateKey ?? '').trim();
       const enabled = botConfig?.enabled ?? true;
-      if (!enabled || !apiUrl || !botUid) {
+      if (!enabled || !botUid) {
         continue;
       }
       try {

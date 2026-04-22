@@ -4,7 +4,6 @@
       "bots": {
         "my-bot-account": {
           "enabled": true,
-          "apiUrl": "https://your-pufferfish-host",
           "botUid": "your-bot-uid",
           "privateKey": "PASTE_YOUR_LOCAL_PRIVATE_KEY_HERE"
         }

@@ -41,7 +41,6 @@ Configure `channels.pufferfish` in `~/.openclaw/openclaw.json`:
       "bots": {
         "my-bot-account": {
           "enabled": true,
-          "apiUrl": "https://your-pufferfish-host",
           "botUid": "your-bot-uid",
           "privateKey": "-----BEGIN PRIVATE KEY-----\n<your-private-key>\n-----END PRIVATE KEY-----"
         }
@@ -56,6 +55,9 @@ Configure `channels.pufferfish` in `~/.openclaw/openclaw.json`:
   }
 }
 ```
+
+`apiUrl` is optional and defaults to production: `https://v1.88.vu`.
+For test/staging, set `bots.<account>.apiUrl` explicitly (for example `https://v1.qqvu.org`).
 
 `systemPrompt` is optional. If omitted or empty, the plugin now sends a neutral fallback prompt so the bot replies directly to user questions without role-play setup chatter.
 

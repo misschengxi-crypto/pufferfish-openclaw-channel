@@ -40,7 +40,8 @@ export interface PufferfishBotProfile {
 /** 单个机器人配置。一个 botUid 就是一只独立机器人。 */
 export interface PufferfishBotConfig {
   enabled?: boolean;
-  apiUrl: string;
+  /** 可选；未配置时使用插件内置默认 API 地址 */
+  apiUrl?: string;
   botUid?: string;
   /** Ed25519 私钥（PEM），用于 connect challenge 签名换取运行 token */
   privateKey?: string;
