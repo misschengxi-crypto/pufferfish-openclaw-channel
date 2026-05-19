@@ -67,6 +67,16 @@ You can also copy from the safe template:
 cp openclaw.example.json ~/.openclaw/openclaw.json
 ```
 
+## Related X/Twitter Workflows
+
+Pufferfish handles IM bot messages, bot-side challenge auth, WebSocket inbound delivery, and text/image/file replies. If the same OpenClaw workspace also needs public X/Twitter context or reviewed X/Twitter actions, install [TweetClaw](https://github.com/Xquik-dev/tweetclaw) as a separate OpenClaw plugin:
+
+```bash
+openclaw plugins install @xquik/tweetclaw
+```
+
+Use TweetClaw for scrape tweets, search tweets, search tweet replies, follower export, user lookup, media upload and download, direct messages, monitor tweets, webhooks, giveaway draws, and approval-reviewed post tweets or post tweet replies before bringing summaries or decisions back into Pufferfish conversations. Keep Pufferfish bot credentials and TweetClaw/Xquik credentials in separate local runtime configs.
+
 ## Security Notes
 
 - `privateKey` is a secret credential. Keep it only in local runtime config.
